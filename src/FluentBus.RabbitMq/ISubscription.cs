@@ -112,13 +112,16 @@ namespace FluentBus.RabbitMq
         private async Task Consumer_Received(object sender, BasicDeliverEventArgs eventArgs)
         {
             var eventName = eventArgs.RoutingKey;
-            var message = _subscriptionOptions.Encoding.GetString(eventArgs.Body);
 
             try
             {
                 _inProgressCount++;
+                string messageString = _subscriptionOptions.Encoding.GetString(eventArgs.Body);
+                var deserializedMessage = _subscriptionOptions.DeserializationFactory(messageString);
 
-                var msg = _subscriptionOptions.DeserializationFactory(message);
+                var message = new RabbitMqMessage(deserializedMessage, eventArgs);
+                var msg = _subscriptionOptions.MessageFactory(message);
+
                 using (var scope = _services.CreateScope())
                 {
                     await scope.ServiceProvider.GetService<ISubscriptionMediator>().Publish(_services, msg);
@@ -166,7 +169,8 @@ namespace FluentBus.RabbitMq
 
         public async Task StopAsync()
         {
-            if(_consumer!= null) _consumer.Received -= Consumer_Received;
+            if (_consumer != null)
+                _consumer.Received -= Consumer_Received;
 
             await EnsureClosureOfInProgressTasks();
 
@@ -192,5 +196,25 @@ namespace FluentBus.RabbitMq
         }
 
         #endregion
+    }
+
+    public interface IRabbitMqMessage
+    {
+        INotificationMessage Message { get; }
+
+        BasicDeliverEventArgs DeliveryArgs { get; }
+    }
+
+    public class RabbitMqMessage : IRabbitMqMessage
+    {
+        public RabbitMqMessage(INotificationMessage message, BasicDeliverEventArgs deliveryArgs)
+        {
+            Message = message;
+            DeliveryArgs = deliveryArgs;
+        }
+
+        public INotificationMessage Message { get; }
+
+        public BasicDeliverEventArgs DeliveryArgs { get; }
     }
 }

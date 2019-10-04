@@ -12,6 +12,7 @@
 * [X] Support for XML Serialization
 * [ ] Support for Protobuf Serialization
 * [X] Have Message processing on Scoped Container
+* [X] Message Enrichment support from RqbbitMq Context
 * [ ] Setting appropriate message properties during Publish
     * [ ] Content-Type
     * [X] Encoding

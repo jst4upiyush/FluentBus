@@ -44,7 +44,7 @@ namespace FluentBus.RabbitMq
 
             var handlerActions = services
                 .GetServices<IMessageConsumer<TNotification>>()
-                .Select(x => HandlePipeline(pipeline, x, (TNotification)notification, cancellationToken))
+                .Select(consumer => HandlePipeline(pipeline, consumer, (TNotification)notification, cancellationToken))
                 .ToList();
 
             await Task.WhenAll(handlerActions);

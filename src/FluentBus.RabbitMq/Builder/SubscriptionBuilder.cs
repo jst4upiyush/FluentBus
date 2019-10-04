@@ -16,7 +16,6 @@ namespace FluentBus.RabbitMq
 
     public class RabbitMqSubscriptionOptions
     {
-
         public string Queue { get; set; }
 
         public string Exchange { get; set; }
@@ -29,6 +28,8 @@ namespace FluentBus.RabbitMq
         public Encoding Encoding { get; set; } = Encoding.UTF8;
 
         public Func<string, INotificationMessage> DeserializationFactory { get; set; }
+
+        public Func<IRabbitMqMessage, INotificationMessage> MessageFactory { get; set; }
     }
 
     public class SubscriptionManagerConfig
@@ -64,6 +65,7 @@ namespace FluentBus.RabbitMq
                 config.MessageType = typeof(TMessage);
                 config.Queue = name;
                 config.DeserializationFactory = msg => JsonConvert.DeserializeObject<TMessage>(msg);
+                config.MessageFactory = msg => msg.Message;
             });
         }
     }

@@ -20,7 +20,7 @@ namespace FluentBus.Examples
                 services.AddTransient(typeof(IConsumerPipelineBehavior<>), typeof(LoggingBehavior<>));
 
                 services.AddTransient<IMessageConsumer<UserCreated>, UserCreatedConsumer>();
-                services.AddTransient<IMessageConsumer<UserDeleted>, UserDeletedConsumer>();
+                services.AddTransient<IMessageConsumer<UserDeletedNotification>, UserDeletedConsumer>();
 
                 var messageBusBuilder = services.AddRabbitMqBus(config => config.Connection = "amqp://guest:guest@localhost:5672");
 
@@ -36,7 +36,7 @@ namespace FluentBus.Examples
                             config.ExchangeType = ExchangeType.Topic;
                         })
                         .ConfigureUserCreatedPublisher()
-                        .Configure<UserDeleted>(config => config.RoutingKey = nameof(UserDeleted));
+                        .Configure<UserDeletedEvent>(config => config.RoutingKey = nameof(UserDeletedEvent));
 
                 services.AddSingleton<IHostedService, Startup>();
             })
@@ -52,14 +52,14 @@ namespace FluentBus.Examples
     {
         private readonly IMessagePublisher _messageBus;
 
-        public Startup(IMessagePublisher messageBus) 
+        public Startup(IMessagePublisher messageBus)
             => _messageBus = messageBus;
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _messageBus.Publish(new UserCreated { Id = 1, Name = "Piyush Rathi" });
             _messageBus.Publish(new UserCreated { Id = 2, Name = "Piyush Rathi" });
-            _messageBus.Publish(new UserDeleted { Id = 1 });
+            _messageBus.Publish(new UserDeletedEvent { Id = 1 });
             return Task.CompletedTask;
         }
 
@@ -74,13 +74,19 @@ namespace FluentBus.Examples
         public int Id { get; set; }
     }
 
-    public class UserDeleted : INotificationMessage
+    public class UserDeletedEvent
     {
         public int Id { get; set; }
     }
 
+    public class UserDeletedNotification : INotificationMessage
+    {
+        public int Id { get; set; }
+        public Guid EventId { get; set; }
+    }
+
     #endregion
-    
+
     #region Subscription Module Extensions
 
     public static class UserSubscriptionModule
@@ -99,12 +105,20 @@ namespace FluentBus.Examples
 
         public static SubscriptionBuilder ConfigureUserDeletedSubscriptions(this SubscriptionBuilder builder)
             => builder
-                    .Add<UserDeleted>(config =>
+                    .Add<UserDeletedNotification>(config =>
                     {
-                        config.Queue = nameof(UserDeleted);
+                        config.Queue = nameof(UserDeletedEvent);
                         config.Exchange = "EX.Events.User";
                         config.ExchangeType = ExchangeType.Topic;
-                        config.RoutingKey = nameof(UserDeleted);
+                        config.RoutingKey = nameof(UserDeletedEvent);
+                        config.MessageFactory = rmqMessage =>
+                        {
+                            if (rmqMessage.Message is UserDeletedNotification msg)
+                            {
+                                msg.EventId = new Guid(rmqMessage.DeliveryArgs.BasicProperties.MessageId);
+                            }
+                            return rmqMessage.Message;
+                        };
                     });
     }
 
@@ -147,11 +161,12 @@ namespace FluentBus.Examples
             await Task.Delay(500);
         }
     }
-    public class UserDeletedConsumer : IMessageConsumer<UserDeleted>
+
+    public class UserDeletedConsumer : IMessageConsumer<UserDeletedNotification>
     {
-        public Task Handle(UserDeleted user, CancellationToken cancellationToken)
+        public Task Handle(UserDeletedNotification user, CancellationToken cancellationToken)
         {
-            Console.WriteLine($"UserDeletedHandler :: {user.Id}");
+            Console.WriteLine($"UserDeletedHandler :: {user.Id} :: {user.EventId}");
             return Task.CompletedTask;
         }
     }
