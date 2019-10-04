@@ -9,20 +9,21 @@ namespace FluentBus.RabbitMq
 {
     internal class SubscriptionMediator : ISubscriptionMediator
     {
-        private readonly IServiceProvider _services;
-
-        public SubscriptionMediator(IServiceProvider services) => _services = services;
-
-        public async Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+        public async Task Publish<TNotification>(
+            IServiceProvider services,
+            TNotification notification,
+            CancellationToken cancellationToken = default)
             where TNotification : INotificationMessage
         {
             if (notification == null)
+            {
                 throw new ArgumentNullException(nameof(notification));
+            }
 
             var notificationType = notification.GetType();
             var wrapper = (NotificationHandlerWrapper)Activator.CreateInstance(typeof(NotificationHandlerWrapperImpl<>).MakeGenericType(notificationType));
 
-            await wrapper.Handle(notification, cancellationToken, _services);
+            await wrapper.Handle(notification, cancellationToken, services);
         }
     }
 

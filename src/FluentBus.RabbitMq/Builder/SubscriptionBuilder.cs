@@ -1,5 +1,6 @@
 ﻿using FluentBus.RabbitMq;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Text;
@@ -15,8 +16,8 @@ namespace FluentBus.RabbitMq
 
     public class RabbitMqSubscriptionOptions
     {
+
         public string Queue { get; set; }
-        public Encoding Encoding { get; set; } = Encoding.UTF8;
 
         public string Exchange { get; set; }
         public string ExchangeType { get; set; }
@@ -24,6 +25,10 @@ namespace FluentBus.RabbitMq
         public string RoutingKey { get; set; }
 
         internal Type MessageType { get; set; }
+
+        public Encoding Encoding { get; set; } = Encoding.UTF8;
+
+        public Func<string, INotificationMessage> DeserializationFactory { get; set; }
     }
 
     public class SubscriptionManagerConfig
@@ -40,11 +45,26 @@ namespace FluentBus.RabbitMq
         {
             string name = typeof(TMessage).Name;
 
-            subscriptionOptions.MessageBus.Services.Configure(name, configureOptions);
-            subscriptionOptions.MessageBus.Services.Configure<RabbitMqSubscriptionOptions>(name, config => config.MessageType = typeof(TMessage));
-            subscriptionOptions.MessageBus.Services.Configure<SubscriptionManagerConfig>(config => config.RegisteredSubscriptions.TryAdd(name, typeof(TMessage)));
+            subscriptionOptions.MessageBus.Services
+                .ConfigureSubscriptionDefaults<TMessage>()
+                .Configure(name, configureOptions)
+                .Configure<RabbitMqSubscriptionOptions>(name, config => config.MessageType = typeof(TMessage))
+                .Configure<SubscriptionManagerConfig>(config => config.RegisteredSubscriptions.TryAdd(name, typeof(TMessage)));
 
             return subscriptionOptions;
+        }
+
+        private static IServiceCollection ConfigureSubscriptionDefaults<TMessage>(
+            this IServiceCollection services)
+                where TMessage : INotificationMessage
+        {
+            string name = typeof(TMessage).Name;
+            return services.Configure<RabbitMqSubscriptionOptions>(name, config =>
+            {
+                config.MessageType = typeof(TMessage);
+                config.Queue = name;
+                config.DeserializationFactory = msg => JsonConvert.DeserializeObject<TMessage>(msg);
+            });
         }
     }
 }

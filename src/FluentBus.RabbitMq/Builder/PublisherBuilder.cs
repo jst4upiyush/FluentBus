@@ -21,7 +21,7 @@ namespace FluentBus.RabbitMq
         public Encoding Encoding { get; set; } = Encoding.UTF8;
         public string ExchangeType { get; set; } = RabbitMQ.Client.ExchangeType.Fanout;
         public byte DeliveryMode { get; set; } = 2;
-        public Func<string, object> Serializer { get; set; } = JsonConvert.SerializeObject;
+        public Func<object, string> Serializer { get; set; } = JsonConvert.SerializeObject;
         internal List<Action<IBasicProperties>> BasicProperties { get; set; } = new List<Action<IBasicProperties>>();
     }
 

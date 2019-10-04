@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FluentBus.RabbitMq
@@ -11,7 +12,7 @@ namespace FluentBus.RabbitMq
         /// <param name="notification">Notification object</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>A task that represents the publish operation.</returns>
-        Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+        Task Publish<TNotification>(IServiceProvider services, TNotification notification, CancellationToken cancellationToken = default)
             where TNotification : INotificationMessage;
     }
 }

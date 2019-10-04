@@ -3,9 +3,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RabbitMQ.Client;
 using System;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace FluentBus.Examples
 {
@@ -91,6 +93,7 @@ namespace FluentBus.Examples
                         config.ExchangeType = ExchangeType.Topic;
                         config.RoutingKey = nameof(UserCreated);
                         config.Encoding = Encoding.Unicode;
+                        config.DeserializationFactory = msg => (UserCreated)new XmlSerializer(typeof(UserCreated)).Deserialize(new StringReader(msg));
                     });
 
         public static SubscriptionBuilder ConfigureUserDeletedSubscriptions(this SubscriptionBuilder builder)
@@ -106,7 +109,7 @@ namespace FluentBus.Examples
 
     #endregion
 
-    #region Oublisher Module Extensions
+    #region Publisher Module Extensions
 
     public static class PublisherModule
     {
@@ -116,7 +119,18 @@ namespace FluentBus.Examples
                 {
                     config.RoutingKey = nameof(UserCreated);
                     config.Encoding = Encoding.Unicode;
+                    config.Serializer = msg => msg.ToXML();
                 });
+
+        public static string ToXML<T>(this T msg)
+        {
+            using (var stringwriter = new StringWriter())
+            {
+                var serializer = new XmlSerializer(msg.GetType());
+                serializer.Serialize(stringwriter, msg);
+                return stringwriter.ToString();
+            }
+        }
     }
 
     #endregion

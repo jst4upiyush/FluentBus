@@ -9,5 +9,6 @@
 * [ ] Degree of Parallelism
 * [ ] Retry policies and Fallback
 * [ ] Message Ack Nack and Dead Letter Queue
-* [ ] Support for XML Serialization
+* [X] Support for XML Serialization
 * [ ] Support for Protobuf Serialization
+* [X] Have Message processing on Scoped Container

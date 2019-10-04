@@ -3,7 +3,7 @@ using System;
 using RabbitMQ.Client;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client.Events;
-using Newtonsoft.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentBus.RabbitMq
 {
@@ -17,24 +17,24 @@ namespace FluentBus.RabbitMq
     {
         #region private fields
 
-        private readonly ISubscriptionMediator _mediator;
+        private readonly IServiceProvider _services;
         private readonly IRabbitMQPersistentConnection _persistentConnection;
         private readonly RabbitMqSubscriptionOptions _subscriptionOptions;
-        private IModel _consumerChannel;
         private readonly string _queueName;
         private readonly string _subscriptionName;
+        private IModel _consumerChannel;
 
         #endregion
 
         #region Constructor
 
         public RabbitMqSubscription(
-            ISubscriptionMediator mediator,
+            IServiceProvider services,
             IRabbitMQPersistentConnection persistentConnection,
             IOptionsSnapshot<RabbitMqSubscriptionOptions> subscriptionOptions,
             string subscriptionName)
         {
-            _mediator = mediator;
+            _services = services;
             _persistentConnection = persistentConnection;
             _subscriptionName = subscriptionName;
 
@@ -114,11 +114,6 @@ namespace FluentBus.RabbitMq
 
             try
             {
-                if (message.ToLowerInvariant().Contains("throw-fake-exception"))
-                {
-                    throw new InvalidOperationException($"Fake exception requested: \"{message}\"");
-                }
-
                 await ProcessEvent(eventName, message);
             }
             catch (Exception ex)
@@ -134,8 +129,11 @@ namespace FluentBus.RabbitMq
 
         private async Task ProcessEvent(string eventName, string message)
         {
-            var msg = JsonConvert.DeserializeObject(message, _subscriptionOptions.MessageType) as INotificationMessage;
-            await _mediator.Publish(msg);
+            var msg = _subscriptionOptions.DeserializationFactory(message);
+            using (var scope = _services.CreateScope())
+            {
+                await scope.ServiceProvider.GetService<ISubscriptionMediator>().Publish(_services, msg);
+            }
         }
 
         #endregion

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using System.Linq;
+using System;
 
 namespace FluentBus.RabbitMq
 {
@@ -16,7 +17,7 @@ namespace FluentBus.RabbitMq
         private List<ISubscription> _subscriptions = new List<ISubscription>();
 
         public SubscriptionManagerService(
-            ISubscriptionMediator mediator,
+            IServiceProvider services,
             IOptions<SubscriptionManagerConfig> subscriptionConfig,
             IRabbitMQPersistentConnection persistentConnection,
             IOptionsSnapshot<RabbitMqSubscriptionOptions> subscriptionOptions)
@@ -26,7 +27,7 @@ namespace FluentBus.RabbitMq
             _subscriptionOptions = subscriptionOptions;
 
             _subscriptions = _subscriptionConfig.Value.RegisteredSubscriptions
-                .Select(s => new RabbitMqSubscription(mediator, _persistentConnection, _subscriptionOptions, s.Key))
+                .Select(s => new RabbitMqSubscription(services, _persistentConnection, _subscriptionOptions, s.Key))
                 .Cast<ISubscription>()
                 .ToList();
         }

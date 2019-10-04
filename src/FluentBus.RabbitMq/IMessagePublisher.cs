@@ -38,7 +38,7 @@ namespace FluentBus.RabbitMq
 
                 channel.ExchangeDeclare(exchange: exchangeName, type: messageBusOptions.ExchangeType);
 
-                var body = messageBusOptions.Encoding.GetBytes(JsonConvert.SerializeObject(message));
+                var body = messageBusOptions.Encoding.GetBytes(messageBusOptions.Serializer(message));
 
                 var properties = channel.CreateBasicProperties();
                 messageBusOptions.BasicProperties.Aggregate(properties, (props, action) => { action(props); return props; });
