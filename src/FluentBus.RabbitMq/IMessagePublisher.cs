@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -42,7 +43,13 @@ namespace FluentBus.RabbitMq
 
                 var properties = channel.CreateBasicProperties();
                 messageBusOptions.BasicProperties.Aggregate(properties, (props, action) => { action(props); return props; });
+
+                properties.Type = message.GetType().FullName;
+                properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                properties.ContentEncoding = messageBusOptions.Encoding.WebName;
                 properties.DeliveryMode = messageBusOptions.DeliveryMode;
+                properties.MessageId = Guid.NewGuid().ToString();
+
 
                 channel.BasicPublish(
                     exchange: exchangeName,
