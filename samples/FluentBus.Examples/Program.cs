@@ -58,6 +58,7 @@ namespace FluentBus.Examples
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _messageBus.Publish(new UserCreated { Id = 1, Name = "Piyush Rathi" });
+            _messageBus.Publish(new UserCreated { Id = 2, Name = "Piyush Rathi" });
             _messageBus.Publish(new UserDeleted { Id = 1 });
             return Task.CompletedTask;
         }
@@ -143,7 +144,7 @@ namespace FluentBus.Examples
         {
             await Task.Delay(500);
             Console.WriteLine($"UserCreatedHandler :: {user.Id} : {user.Name}");
-            await Task.Delay(200);
+            await Task.Delay(500);
         }
     }
     public class UserDeletedConsumer : IMessageConsumer<UserDeleted>

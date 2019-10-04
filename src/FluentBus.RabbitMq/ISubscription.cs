@@ -4,6 +4,7 @@ using RabbitMQ.Client;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client.Events;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reactive.Linq;
 
 namespace FluentBus.RabbitMq
 {
@@ -22,6 +23,7 @@ namespace FluentBus.RabbitMq
         private readonly RabbitMqSubscriptionOptions _subscriptionOptions;
         private readonly string _queueName;
         private readonly string _subscriptionName;
+        private AsyncEventingBasicConsumer _consumer;
         private IModel _consumerChannel;
 
         #endregion
@@ -92,14 +94,14 @@ namespace FluentBus.RabbitMq
 
             if (_consumerChannel != null)
             {
-                var consumer = new AsyncEventingBasicConsumer(_consumerChannel);
+                _consumer = new AsyncEventingBasicConsumer(_consumerChannel);
 
-                consumer.Received += Consumer_Received;
+                _consumer.Received += Consumer_Received;
 
                 _consumerChannel.BasicConsume(
                     queue: _queueName,
                     autoAck: false,
-                    consumer: consumer);
+                    consumer: _consumer);
             }
             else
             {
@@ -114,11 +116,21 @@ namespace FluentBus.RabbitMq
 
             try
             {
-                await ProcessEvent(eventName, message);
+                _inProgressCount++;
+
+                var msg = _subscriptionOptions.DeserializationFactory(message);
+                using (var scope = _services.CreateScope())
+                {
+                    await scope.ServiceProvider.GetService<ISubscriptionMediator>().Publish(_services, msg);
+                }
             }
             catch (Exception ex)
             {
                 //_logger.LogWarning(ex, "----- ERROR Processing message \"{Message}\"", message);
+            }
+            finally
+            {
+                _inProgressCount--;
             }
 
             // Even on exception we take the message off the queue.
@@ -127,27 +139,15 @@ namespace FluentBus.RabbitMq
             _consumerChannel.BasicAck(eventArgs.DeliveryTag, multiple: false);
         }
 
-        private async Task ProcessEvent(string eventName, string message)
-        {
-            var msg = _subscriptionOptions.DeserializationFactory(message);
-            using (var scope = _services.CreateScope())
-            {
-                await scope.ServiceProvider.GetService<ISubscriptionMediator>().Publish(_services, msg);
-            }
-        }
-
         #endregion
 
         #region IDisposable
 
         public void Dispose()
         {
-            if (_consumerChannel != null)
-            {
-                _consumerChannel.Dispose();
-                _consumerChannel = null;
-            }
+            StopAsync().Wait();
         }
+
         #endregion
 
         #region ISubscription Implementation
@@ -164,11 +164,31 @@ namespace FluentBus.RabbitMq
             return Task.CompletedTask;
         }
 
-        public Task StopAsync()
+        public async Task StopAsync()
         {
-            _consumerChannel.Dispose();
-            _consumerChannel = null;
-            return Task.CompletedTask;
+            if(_consumer!= null) _consumer.Received -= Consumer_Received;
+
+            await EnsureClosureOfInProgressTasks();
+
+            if (_consumerChannel != null)
+            {
+                _consumerChannel.Dispose();
+                _consumerChannel = null;
+            }
+        }
+
+        #endregion
+
+        #region Graceful Exit
+
+        private int _inProgressCount = 0;
+
+        private async Task EnsureClosureOfInProgressTasks()
+        {
+            if (_inProgressCount > 0)
+                await Observable
+                           .Interval(TimeSpan.FromMilliseconds(50))
+                           .TakeWhile(x => _inProgressCount > 0);
         }
 
         #endregion
