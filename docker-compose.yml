@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  mongo-db:
+    image: mongo
+    container_name: subscription-mongo
+    ports:
+      - "27017:27017"
+  rabbit-mq:
+    image: rabbitmq:3-management
+    container_name: subscription-rabbit
+    ports:
+      - "15672:15672"
+      - "5672:5672"
