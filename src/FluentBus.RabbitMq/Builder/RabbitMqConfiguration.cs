@@ -23,6 +23,7 @@ namespace FluentBus.RabbitMq
             services.TryAddSingleton<IRabbitMQPersistentConnection, DefaultRabbitMQPersistentConnection>();
 
             services.TryAddSingleton<IHostedService, SubscriptionManagerService>();
+            services.TryAddTransient(typeof(NotificationHandlerWrapperImpl<>));
 
             services.AddSubscriptionMediator();
 

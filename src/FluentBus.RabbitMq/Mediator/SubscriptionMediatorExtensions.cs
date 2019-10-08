@@ -7,7 +7,7 @@ namespace FluentBus.RabbitMq
     {
         public static IServiceCollection AddSubscriptionMediator(this IServiceCollection services)
         {
-            services.TryAddSingleton<ISubscriptionMediator, SubscriptionMediator>();
+            services.TryAddTransient<ISubscriptionMediator, SubscriptionMediator>();
             return services;
         }
     }

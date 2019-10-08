@@ -9,11 +9,14 @@ namespace FluentBus.RabbitMq
 {
     internal class SubscriptionMediator : ISubscriptionMediator
     {
-        public async Task Publish<TNotification>(
-            IServiceProvider services,
-            TNotification notification,
+        private readonly IServiceProvider _services;
+
+        public SubscriptionMediator(IServiceProvider services)
+            => _services = services;
+
+        public async Task Publish(
+            INotificationMessage notification,
             CancellationToken cancellationToken = default)
-            where TNotification : INotificationMessage
         {
             if (notification == null)
             {
@@ -21,28 +24,33 @@ namespace FluentBus.RabbitMq
             }
 
             var notificationType = notification.GetType();
-            var wrapper = (NotificationHandlerWrapper)Activator.CreateInstance(typeof(NotificationHandlerWrapperImpl<>).MakeGenericType(notificationType));
+            var wrapper = (NotificationHandlerWrapper)_services.GetService(typeof(NotificationHandlerWrapperImpl<>).MakeGenericType(notificationType));
 
-            await wrapper.Handle(notification, cancellationToken, services);
+            await wrapper.Handle(notification, cancellationToken);
         }
     }
 
     internal abstract class NotificationHandlerWrapper
     {
-        public abstract Task Handle(INotificationMessage notification, CancellationToken cancellationToken, IServiceProvider services);
+        public abstract Task Handle(INotificationMessage notification, CancellationToken cancellationToken);
     }
 
     internal class NotificationHandlerWrapperImpl<TNotification> : NotificationHandlerWrapper
         where TNotification : INotificationMessage
     {
-        public override async Task Handle(INotificationMessage notification, CancellationToken cancellationToken, IServiceProvider services)
+        private readonly IServiceProvider _services;
+
+        public NotificationHandlerWrapperImpl(IServiceProvider services)
+            => _services = services;
+
+        public override async Task Handle(INotificationMessage notification, CancellationToken cancellationToken)
         {
-            var pipeline = services
+            var pipeline = _services
                 .GetServices<IConsumerPipelineBehavior<TNotification>>()
                 .Reverse()
                 .ToList();
 
-            var handlerActions = services
+            var handlerActions = _services
                 .GetServices<IMessageConsumer<TNotification>>()
                 .Select(consumer => HandlePipeline(pipeline, consumer, (TNotification)notification, cancellationToken))
                 .ToList();
