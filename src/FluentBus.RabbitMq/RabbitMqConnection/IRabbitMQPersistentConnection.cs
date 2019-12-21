@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
-using Polly.Retry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
@@ -11,7 +10,7 @@ using System.Net.Sockets;
 
 namespace FluentBus.RabbitMq
 {
-    public interface IRabbitMQPersistentConnection
+    internal interface IRabbitMQPersistentConnection
         : IDisposable
     {
         bool IsConnected { get; }
@@ -45,13 +44,7 @@ namespace FluentBus.RabbitMq
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public bool IsConnected
-        {
-            get
-            {
-                return _connection != null && _connection.IsOpen && !_disposed;
-            }
-        }
+        public bool IsConnected => _connection != null && _connection.IsOpen && !_disposed;
 
         public IModel CreateModel()
         {
@@ -85,7 +78,7 @@ namespace FluentBus.RabbitMq
 
             lock (sync_root)
             {
-                var policy = RetryPolicy.Handle<SocketException>()
+                var policy = Policy.Handle<SocketException>()
                     .Or<BrokerUnreachableException>()
                     .WaitAndRetry(_retryCount, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), (ex, time) =>
                     {
@@ -93,11 +86,7 @@ namespace FluentBus.RabbitMq
                     }
                 );
 
-                policy.Execute(() =>
-                {
-                    _connection = _connectionFactory
-                          .CreateConnection();
-                });
+                policy.Execute(() =>_connection = _connectionFactory.CreateConnection());
 
                 if (IsConnected)
                 {
@@ -127,7 +116,7 @@ namespace FluentBus.RabbitMq
             TryConnect();
         }
 
-        void OnCallbackException(object sender, CallbackExceptionEventArgs e)
+        private void OnCallbackException(object sender, CallbackExceptionEventArgs e)
         {
             if (_disposed) return;
 
@@ -136,7 +125,7 @@ namespace FluentBus.RabbitMq
             TryConnect();
         }
 
-        void OnConnectionShutdown(object sender, ShutdownEventArgs reason)
+        private void OnConnectionShutdown(object sender, ShutdownEventArgs reason)
         {
             if (_disposed) return;
 
